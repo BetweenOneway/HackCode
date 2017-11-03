@@ -49,4 +49,5 @@ public:
 	int iPid;
 	// 调整当前进程权限
 	void DebugPrivilege();
+	afx_msg void OnBnClickedPauseprocess();
 };
