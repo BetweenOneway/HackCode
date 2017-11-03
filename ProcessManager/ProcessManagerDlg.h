@@ -50,4 +50,5 @@ public:
 	// 调整当前进程权限
 	void DebugPrivilege();
 	afx_msg void OnBnClickedPauseprocess();
+	afx_msg void OnBnClickedResumeprocess();
 };

@@ -38,6 +38,7 @@ BEGIN_MESSAGE_MAP(CProcessManagerDlg, CDialogEx)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_PROCESSLIST, &CProcessManagerDlg::OnLvnItemchangedProcesslist)
 	ON_NOTIFY(NM_CLICK, IDC_PROCESSLIST, &CProcessManagerDlg::OnNMClickProcesslist)
 	ON_BN_CLICKED(IDC_PAUSEPROCESS, &CProcessManagerDlg::OnBnClickedPauseprocess)
+	ON_BN_CLICKED(IDC_RESUMEPROCESS, &CProcessManagerDlg::OnBnClickedResumeprocess)
 END_MESSAGE_MAP()
 
 
@@ -220,5 +221,31 @@ void CProcessManagerDlg::OnBnClickedPauseprocess()
 			CloseHandle(hThread);
 		}
 		bRet = Thread32Next(hSnap, &Te32);
+	}
+}
+
+
+void CProcessManagerDlg::OnBnClickedResumeprocess()
+{
+	// TODO: Add your control notification handler code here
+	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, iPid);
+	if (INVALID_HANDLE_VALUE == hSnap)
+	{
+		AfxMessageBox(_T("CreateToolhelp32Snapshot Error"));
+		return;
+	}
+	THREADENTRY32 te32 = { 0 };
+	te32.dwSize = sizeof(THREADENTRY32);
+	
+	BOOL bRet = Thread32First(hSnap, &te32);
+	while (bRet)
+	{
+		if (iPid == te32.th32OwnerProcessID)
+		{
+			HANDLE hThread = OpenThread(THREAD_ALL_ACCESS, FALSE, te32.th32ThreadID);
+			ResumeThread(hThread);
+			CloseHandle(hThread);
+		}
+		bRet = Thread32Next(hSnap, &te32);
 	}
 }
