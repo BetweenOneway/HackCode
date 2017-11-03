@@ -199,7 +199,7 @@ void CProcessManagerDlg::DebugPrivilege()
 	}
 }
 
-
+//暂停进程
 void CProcessManagerDlg::OnBnClickedPauseprocess()
 {
 	// TODO: Add your control notification handler code here
@@ -224,7 +224,7 @@ void CProcessManagerDlg::OnBnClickedPauseprocess()
 	}
 }
 
-
+//重启进程
 void CProcessManagerDlg::OnBnClickedResumeprocess()
 {
 	// TODO: Add your control notification handler code here
