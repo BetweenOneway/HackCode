@@ -168,7 +168,9 @@ void CProcessManagerDlg::OnLvnItemchangedProcesslist(NMHDR *pNMHDR, LRESULT *pRe
 	*pResult = 0;
 }
 
-
+/*
+单击进程列表时，显示当前进程相关模块
+*/
 void CProcessManagerDlg::OnNMClickProcesslist(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
