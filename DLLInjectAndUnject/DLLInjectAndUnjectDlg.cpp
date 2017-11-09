@@ -6,6 +6,7 @@
 #include "DLLInjectAndUnject.h"
 #include "DLLInjectAndUnjectDlg.h"
 #include "afxdialogex.h"
+#include <Tlhelp32.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -33,6 +34,7 @@ BEGIN_MESSAGE_MAP(CDLLInjectAndUnjectDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_INJECT, &CDLLInjectAndUnjectDlg::OnBnClickedInject)
+	ON_BN_CLICKED(IDC_UNJECT, &CDLLInjectAndUnjectDlg::OnBnClickedUnject)
 END_MESSAGE_MAP()
 
 
@@ -89,8 +91,11 @@ HCURSOR CDLLInjectAndUnjectDlg::OnQueryDragIcon()
 }
 
 
-
-// DLL注入
+ 
+/*
+DLL注入
+核心原理：系统库，在每个进程中的加载位置是相同的
+*/
 void CDLLInjectAndUnjectDlg::InjectDll(DWORD dwPid, TCHAR * szDllName)
 {
 	if (0 == dwPid || 0 == _tcslen(szDllName))
@@ -100,28 +105,40 @@ void CDLLInjectAndUnjectDlg::InjectDll(DWORD dwPid, TCHAR * szDllName)
 
 #ifdef UNICODE
 	char* pFunName = "LoadLibraryW";
+	LPVOID pFunc = LoadLibraryW;
 #else
 	char* pFunName = "LoadLibraryA";
+	LPVOID pFunc = LoadLibraryA;
 #endif
 
-	
+	//获取进程句柄
 	HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPid);
 	if (INVALID_HANDLE_VALUE == hProcess)
 	{
 		return;
 	}
-	int nDllLen = _tcslen(szDllName) + sizeof(TCHAR);
+	//申请分配进程空间
+	int nDllLen = (_tcslen(szDllName)+1) * sizeof(TCHAR);
 	PVOID pDllAddr = VirtualAllocEx(hProcess, NULL, nDllLen, MEM_COMMIT, PAGE_READWRITE);
 	if (NULL == pDllAddr)
 	{
 		CloseHandle(hProcess);
 		return;
 	}
+	//将DLL写入进程空间
 	SIZE_T dwWriteNum = 0;
-	WriteProcessMemory(hProcess, pDllAddr, szDllName, nDllLen,&dwWriteNum);
+	if (WriteProcessMemory(hProcess, pDllAddr, szDllName, nDllLen, &dwWriteNum))
+	{
+		if (dwWriteNum != nDllLen)
+		{
+			//没有完全写入
+			VirtualFreeEx(hProcess, pDllAddr, dwWriteNum, MEM_DECOMMIT);
+			CloseHandle(hProcess);
+		}
+	}
+	//创建远程线程函数 LoadLibrary
 	FARPROC pFunAddr = GetProcAddress(GetModuleHandle(_T("Kernel32.dll")), pFunName);
-
-	HANDLE hThread = CreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)pFunAddr, pDllAddr, 0, NULL);
+	HANDLE hThread = CreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)pFunc, pDllAddr, 0, NULL);
 	if (NULL == hThread)
 	{
 		DWORD dwErrorCode = GetLastError();
@@ -167,4 +184,50 @@ void CDLLInjectAndUnjectDlg::Privilege()
 
 		CloseHandle(hToken);
 	}
+}
+
+/*
+DLL卸载
+*/
+void CDLLInjectAndUnjectDlg::UnInjectDll(DWORD dwPid, TCHAR * szDllName)
+{
+	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, dwPid);
+	MODULEENTRY32 Me32 = { 0 };
+	Me32.dwSize = sizeof(MODULEENTRY32);
+
+	BOOL bRet = Module32First(hSnap, &Me32);
+	while(bRet)
+	{
+		if (0 == _tcscmp(Me32.szExePath, szDllName))
+		{
+			break;
+		}
+		bRet = Module32Next(hSnap, &Me32);
+	}
+	CloseHandle(hSnap);
+	
+	LPVOID pFunc = FreeLibrary;
+	HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPid);
+	HANDLE hThread = CreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)pFunc, Me32.hModule, 0, NULL);
+
+	WaitForSingleObject(hThread, INFINITE);
+
+	CloseHandle(hThread);
+	CloseHandle(hProcess);
+}
+
+
+void CDLLInjectAndUnjectDlg::OnBnClickedUnject()
+{
+	// TODO: Add your control notification handler code here
+	TCHAR szDllFullPath[MAX_PATH] = { 0 };
+	TCHAR szPid[MAX_PATH] = { 0 };
+
+	DllFullPath.GetWindowText(szDllFullPath, MAX_PATH);
+	Pid.GetWindowText(szPid, MAX_PATH);
+
+	DWORD dwPid = _ttol(szPid);
+
+	Privilege();
+	UnInjectDll(dwPid, szDllFullPath);
 }

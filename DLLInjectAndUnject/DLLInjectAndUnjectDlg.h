@@ -40,4 +40,6 @@ public:
 	CEdit Pid;
 	afx_msg void OnBnClickedInject();
 	void Privilege();
+	void UnInjectDll(DWORD dwPid, TCHAR * szDllName);
+	afx_msg void OnBnClickedUnject();
 };
