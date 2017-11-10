@@ -12,6 +12,18 @@
 #define new DEBUG_NEW
 #endif
 
+#define STRLEN 20
+typedef struct _DATA
+{
+	DWORD dwLoadLibrary;
+	DWORD dwGetProcAddress;
+	DWORD dwGetModuleHandle;
+	DWORD dwGetModuleFileName;
+
+	TCHAR User32Dll[STRLEN];
+	TCHAR MessageBox[STRLEN];
+	TCHAR Str[STRLEN];
+}DATA,*PDATA;
 
 // CDLLInjectAndUnjectDlg dialog
 
@@ -230,4 +242,86 @@ void CDLLInjectAndUnjectDlg::OnBnClickedUnject()
 
 	Privilege();
 	UnInjectDll(dwPid, szDllFullPath);
+}
+
+DWORD WINAPI RemoteThreadProc(LPVOID lpParam)
+{
+	PDATA pData = (PDATA)lpParam;
+
+	HMODULE(__stdcall *MyLoadLibrary)(LPCTSTR);
+	FARPROC(__stdcall *MyGetProcAddress)(HMODULE, LPCTSTR);
+	HMODULE(__stdcall *MyGetModuleHandle)(LPCTSTR);
+	DWORD(__stdcall *MyGetModuleFileName)(HMODULE,LPTSTR,DWORD);
+	int(__stdcall *MyMessageBox)(HWND, LPCTSTR, LPCTSTR, UINT);
+
+	MyLoadLibrary = (HMODULE(__stdcall *)(LPCTSTR))pData->dwLoadLibrary;
+	MyGetProcAddress = (FARPROC(__stdcall *)(HMODULE, LPCTSTR))pData->dwGetProcAddress;
+	MyGetModuleHandle = (HMODULE(__stdcall *)(LPCTSTR))pData->dwGetModuleHandle;
+	MyGetModuleFileName = (DWORD(__stdcall *)(HMODULE, LPTSTR, DWORD))pData->dwGetModuleFileName;
+
+	HMODULE hModule = MyLoadLibrary(pData->User32Dll);
+	MyMessageBox = (int(__stdcall *)(HWND, LPCTSTR, LPCTSTR, UINT))MyGetProcAddress(hModule, pData->MessageBox);
+
+	TCHAR szModuleName[MAX_PATH] = { 0 };
+	MyGetModuleFileName(NULL, szModuleName, MAX_PATH);
+
+	MyMessageBox(NULL, pData->Str, szModuleName, MB_OK);
+
+	return 0;
+}
+
+VOID CDLLInjectAndUnjectDlg::InjectCode(DWORD dwPid)
+{
+	HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPid);
+	if (NULL == hProcess)
+	{
+		AfxMessageBox(_T("Open process error"));
+		return;
+	}
+	DATA Data = { 0 };
+
+#ifdef UNICODE
+	Data.dwLoadLibrary = (DWORD)GetProcAddress(GetModuleHandle(_T("kernel32.dll")), "LoadLibraryW");
+#else
+	Data.dwLoadLibrary = (DWORD)GetProcAddress(GetModuleHandle(_T("kernel32.dll")), "LoadLibraryA");
+#endif
+	
+	Data.dwGetProcAddress = (DWORD)GetProcAddress(GetModuleHandle(_T("kernel32.dll")),"GetProcAddress");
+
+#ifdef UNICODE
+	Data.dwGetModuleHandle = (DWORD)GetProcAddress(GetModuleHandle(_T("kernel32.dll")), "GetModuleHandleW");
+#else
+	Data.dwGetModuleHandle = (DWORD)GetProcAddress(GetModuleHandle(_T("kernel32.dll")), "GetModuleHandleA");
+#endif
+
+#ifdef UNICODE
+	Data.dwGetModuleFileName = (DWORD)GetProcAddress(GetModuleHandle(_T("kernel32.dll")), "GetModuleFileNameW");
+#else
+	Data.dwGetModuleFileName = (DWORD)GetProcAddress(GetModuleHandle(_T("kernel32.dll")), "GetModuleFileNameA");
+#endif
+	
+
+	lstrcpy(Data.User32Dll, _T("user32.dll"));
+#ifdef UNICODE
+	lstrcpy(Data.MessageBoxW, _T("MessageBoxW"));
+#else
+	lstrcpy(Data.MessageBoxW, _T("MessageBoxA"));
+#endif
+	
+	lstrcpy(Data.Str, _T("Inject Code"));
+
+	LPVOID lpData = VirtualAllocEx(hProcess, NULL, sizeof(DATA), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	SIZE_T dwWriteNum = 0;
+	WriteProcessMemory(hProcess, lpData, &Data, sizeof(DATA), &dwWriteNum);
+
+	DWORD dwFunSize = 0x2000;
+	LPVOID lpCode = VirtualAllocEx(hProcess, NULL, dwFunSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	WriteProcessMemory(hProcess, lpCode, RemoteThreadProc, dwFunSize, &dwWriteNum);
+
+	HANDLE hRemoteThread = CreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)lpCode, lpData, 0, NULL);
+
+	WaitForSingleObject(hRemoteThread, INFINITE);
+	CloseHandle(hRemoteThread);
+	CloseHandle(hProcess);
+	return VOID();
 }

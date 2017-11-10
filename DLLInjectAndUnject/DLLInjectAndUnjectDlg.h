@@ -42,4 +42,5 @@ public:
 	void Privilege();
 	void UnInjectDll(DWORD dwPid, TCHAR * szDllName);
 	afx_msg void OnBnClickedUnject();
+	VOID InjectCode(DWORD dwPid);
 };
