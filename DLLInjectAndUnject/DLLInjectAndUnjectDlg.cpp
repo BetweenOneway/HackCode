@@ -12,7 +12,7 @@
 #define new DEBUG_NEW
 #endif
 
-#define STRLEN 20
+#define STRLEN 200
 typedef struct _DATA
 {
 	DWORD dwLoadLibrary;
@@ -178,7 +178,14 @@ void CDLLInjectAndUnjectDlg::OnBnClickedInject()
 	DWORD dwPid = _ttol(szPid);
 
 	Privilege();
-	InjectDll(dwPid, szDllFullPath);
+	if (0 == _tcslen(szDllFullPath))
+	{
+		InjectCode(dwPid);
+	}
+	else
+	{
+		InjectDll(dwPid, szDllFullPath);
+	}
 }
 
 
@@ -259,13 +266,18 @@ DWORD WINAPI RemoteThreadProc(LPVOID lpParam)
 	MyGetModuleHandle = (HMODULE(__stdcall *)(LPCTSTR))pData->dwGetModuleHandle;
 	MyGetModuleFileName = (DWORD(__stdcall *)(HMODULE, LPTSTR, DWORD))pData->dwGetModuleFileName;
 
-	HMODULE hModule = MyLoadLibrary(pData->User32Dll);
-	MyMessageBox = (int(__stdcall *)(HWND, LPCTSTR, LPCTSTR, UINT))MyGetProcAddress(hModule, pData->MessageBox);
+	
+	HMODULE hModule = LoadLibrary(pData->User32Dll);
+	
+	//有问题，会引发注入目标进程崩溃
+	//MyMessageBox = (int(__stdcall *)(HWND, LPCTSTR, LPCTSTR, UINT))MyGetProcAddress(hModule, pData->MessageBox);
 
 	TCHAR szModuleName[MAX_PATH] = { 0 };
-	MyGetModuleFileName(NULL, szModuleName, MAX_PATH);
+	//GetModuleFileName(hModule, szModuleName, MAX_PATH);
+	MessageBox(NULL, pData->Str, _T(""), MB_OK);
+	//MyGetModuleFileName(NULL, szModuleName, MAX_PATH);
 
-	MyMessageBox(NULL, pData->Str, szModuleName, MB_OK);
+	//MyMessageBox(NULL, pData->Str, szModuleName, MB_OK);
 
 	return 0;
 }
@@ -310,11 +322,13 @@ VOID CDLLInjectAndUnjectDlg::InjectCode(DWORD dwPid)
 	
 	lstrcpy(Data.Str, _T("Inject Code"));
 
+	//分配线程函数参数空间
 	LPVOID lpData = VirtualAllocEx(hProcess, NULL, sizeof(DATA), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	SIZE_T dwWriteNum = 0;
 	WriteProcessMemory(hProcess, lpData, &Data, sizeof(DATA), &dwWriteNum);
 
-	DWORD dwFunSize = 0x2000;
+	//分配线程函数空间
+	DWORD dwFunSize = 0x4000;
 	LPVOID lpCode = VirtualAllocEx(hProcess, NULL, dwFunSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 	WriteProcessMemory(hProcess, lpCode, RemoteThreadProc, dwFunSize, &dwWriteNum);
 
