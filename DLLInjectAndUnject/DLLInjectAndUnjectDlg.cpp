@@ -23,6 +23,7 @@ typedef struct _DATA
 	TCHAR User32Dll[STRLEN];
 	TCHAR MessageBox[STRLEN];
 	TCHAR Str[STRLEN];
+	TCHAR szModuleName[MAX_PATH];
 }DATA,*PDATA;
 
 // CDLLInjectAndUnjectDlg dialog
@@ -251,45 +252,50 @@ void CDLLInjectAndUnjectDlg::OnBnClickedUnject()
 	UnInjectDll(dwPid, szDllFullPath);
 }
 
+/*
+注入线程函数中不能申请临时变量
+ 有说法是不能在注入函数中使用超过4KB的临时变量空间
+*/
 DWORD WINAPI RemoteThreadProc(LPVOID lpParam)
 {
+
 	PDATA pData = (PDATA)lpParam;
 
-	HMODULE(__stdcall *MyLoadLibrary)(LPCTSTR);
-	FARPROC(__stdcall *MyGetProcAddress)(HMODULE, LPCTSTR);
-	HMODULE(__stdcall *MyGetModuleHandle)(LPCTSTR);
-	DWORD(__stdcall *MyGetModuleFileName)(HMODULE,LPTSTR,DWORD);
-	int(__stdcall *MyMessageBox)(HWND, LPCTSTR, LPCTSTR, UINT);
+	HMODULE(WINAPI *MyLoadLibrary)(LPCTSTR);
+	FARPROC(WINAPI *MyGetProcAddress)(HMODULE, LPCSTR);
+	HMODULE(WINAPI *MyGetModuleHandle)(LPCTSTR);
+	DWORD(WINAPI *MyGetModuleFileName)(HMODULE,LPTSTR,DWORD);
+	int(WINAPI *MyMessageBox)(HWND, LPCTSTR, LPCTSTR, UINT);
 
-	MyLoadLibrary = (HMODULE(__stdcall *)(LPCTSTR))pData->dwLoadLibrary;
-	MyGetProcAddress = (FARPROC(__stdcall *)(HMODULE, LPCTSTR))pData->dwGetProcAddress;
-	MyGetModuleHandle = (HMODULE(__stdcall *)(LPCTSTR))pData->dwGetModuleHandle;
-	MyGetModuleFileName = (DWORD(__stdcall *)(HMODULE, LPTSTR, DWORD))pData->dwGetModuleFileName;
-
+	MyLoadLibrary = (HMODULE(WINAPI *)(LPCTSTR))pData->dwLoadLibrary;
+	MyGetProcAddress = (FARPROC(WINAPI *)(HMODULE, LPCSTR))pData->dwGetProcAddress;
+	MyGetModuleHandle = (HMODULE(WINAPI *)(LPCTSTR))pData->dwGetModuleHandle;
+	MyGetModuleFileName = (DWORD(WINAPI *)(HMODULE, LPTSTR, DWORD))pData->dwGetModuleFileName;
 	
-	HMODULE hModule = LoadLibrary(pData->User32Dll);
-	
-	//有问题，会引发注入目标进程崩溃
-	//MyMessageBox = (int(__stdcall *)(HWND, LPCTSTR, LPCTSTR, UINT))MyGetProcAddress(hModule, pData->MessageBox);
+	HMODULE hModule = MyLoadLibrary(pData->User32Dll);
+	if (NULL == hModule)
+	{
+		MessageBox(NULL,  _T("Invalid MyLoadLibrary"), pData->Str, MB_OK);
+		return 0;
+	}
+	//这里有问题
+	MyMessageBox = (int(WINAPI *)(HWND, LPCTSTR, LPCTSTR, UINT))MyGetProcAddress(hModule, (LPCSTR)pData->MessageBox);
+	if (NULL == MyMessageBox)
+	{
+		MessageBox(NULL, _T("Invalid MessageBox"),pData->Str, MB_OK);
+		return 0;
+	}
 
-	TCHAR szModuleName[MAX_PATH] = { 0 };
-	//GetModuleFileName(hModule, szModuleName, MAX_PATH);
-	MessageBox(NULL, pData->Str, _T(""), MB_OK);
-	//MyGetModuleFileName(NULL, szModuleName, MAX_PATH);
-
-	//MyMessageBox(NULL, pData->Str, szModuleName, MB_OK);
+	MyGetModuleFileName(hModule, pData->szModuleName, MAX_PATH);
+	MessageBox(NULL, pData->szModuleName, pData->Str,  MB_OK);
+	//会有问题，会崩溃
+	//MyMessageBox(NULL, _T("Temp"), _T(""),  MB_OK);
 
 	return 0;
 }
 
 VOID CDLLInjectAndUnjectDlg::InjectCode(DWORD dwPid)
 {
-	HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPid);
-	if (NULL == hProcess)
-	{
-		AfxMessageBox(_T("Open process error"));
-		return;
-	}
 	DATA Data = { 0 };
 
 #ifdef UNICODE
@@ -297,8 +303,8 @@ VOID CDLLInjectAndUnjectDlg::InjectCode(DWORD dwPid)
 #else
 	Data.dwLoadLibrary = (DWORD)GetProcAddress(GetModuleHandle(_T("kernel32.dll")), "LoadLibraryA");
 #endif
-	
-	Data.dwGetProcAddress = (DWORD)GetProcAddress(GetModuleHandle(_T("kernel32.dll")),"GetProcAddress");
+
+	Data.dwGetProcAddress = (DWORD)GetProcAddress(GetModuleHandle(_T("kernel32.dll")), "GetProcAddress");
 
 #ifdef UNICODE
 	Data.dwGetModuleHandle = (DWORD)GetProcAddress(GetModuleHandle(_T("kernel32.dll")), "GetModuleHandleW");
@@ -311,24 +317,31 @@ VOID CDLLInjectAndUnjectDlg::InjectCode(DWORD dwPid)
 #else
 	Data.dwGetModuleFileName = (DWORD)GetProcAddress(GetModuleHandle(_T("kernel32.dll")), "GetModuleFileNameA");
 #endif
-	
 
-	lstrcpy(Data.User32Dll, _T("user32.dll"));
+
+	lstrcpy(Data.User32Dll, _T("kernel32.dll"));
 #ifdef UNICODE
-	lstrcpy(Data.MessageBoxW, _T("MessageBoxW"));
+	lstrcpy(Data.MessageBox, _T("MessageBoxW"));
 #else
-	lstrcpy(Data.MessageBoxW, _T("MessageBoxA"));
+	lstrcpy(Data.MessageBox, _T("MessageBoxA"));
 #endif
-	
+
 	lstrcpy(Data.Str, _T("Inject Code"));
 
+	HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPid);
+	if (NULL == hProcess)
+	{
+		AfxMessageBox(_T("Open process error"));
+		return;
+	}
+
 	//分配线程函数参数空间
-	LPVOID lpData = VirtualAllocEx(hProcess, NULL, sizeof(DATA), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	LPVOID lpData = VirtualAllocEx(hProcess, NULL, sizeof(DATA), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 	SIZE_T dwWriteNum = 0;
 	WriteProcessMemory(hProcess, lpData, &Data, sizeof(DATA), &dwWriteNum);
 
 	//分配线程函数空间
-	DWORD dwFunSize = 0x4000;
+	DWORD dwFunSize = 0xF000;
 	LPVOID lpCode = VirtualAllocEx(hProcess, NULL, dwFunSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 	WriteProcessMemory(hProcess, lpCode, RemoteThreadProc, dwFunSize, &dwWriteNum);
 
