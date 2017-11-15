@@ -21,7 +21,7 @@ typedef struct _DATA
 	DWORD dwGetModuleFileName;
 
 	TCHAR User32Dll[STRLEN];
-	TCHAR MessageBox[STRLEN];
+	char strMessageBox[STRLEN];
 	TCHAR Str[STRLEN];
 	TCHAR szModuleName[MAX_PATH];
 }DATA,*PDATA;
@@ -278,18 +278,18 @@ DWORD WINAPI RemoteThreadProc(LPVOID lpParam)
 		MessageBox(NULL,  _T("Invalid MyLoadLibrary"), pData->Str, MB_OK);
 		return 0;
 	}
-	//这里有问题
-	MyMessageBox = (int(WINAPI *)(HWND, LPCTSTR, LPCTSTR, UINT))MyGetProcAddress(hModule, (LPCSTR)pData->MessageBox);
+
+	//GetProcAddress第二个参数不支持UNICODE类型，也不支持强转，必须是ANSI类型
+	MyMessageBox = (int(WINAPI *)(HWND, LPCTSTR, LPCTSTR, UINT))MyGetProcAddress(hModule, pData->strMessageBox);
 	if (NULL == MyMessageBox)
 	{
-		MessageBox(NULL, _T("Invalid MessageBox"),pData->Str, MB_OK);
+		FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, GetLastError(), 0, pData->szModuleName, MAXBYTE, 0);
+		MessageBox(NULL, pData->szModuleName,_T("GetMessageBoxError"), MB_OK);
 		return 0;
 	}
 
 	MyGetModuleFileName(hModule, pData->szModuleName, MAX_PATH);
-	MessageBox(NULL, pData->szModuleName, pData->Str,  MB_OK);
-	//会有问题，会崩溃
-	//MyMessageBox(NULL, _T("Temp"), _T(""),  MB_OK);
+	MyMessageBox(NULL, pData->Str, pData->szModuleName,  MB_OK);
 
 	return 0;
 }
@@ -319,11 +319,11 @@ VOID CDLLInjectAndUnjectDlg::InjectCode(DWORD dwPid)
 #endif
 
 
-	lstrcpy(Data.User32Dll, _T("kernel32.dll"));
+	lstrcpy(Data.User32Dll, _T("user32.dll"));
 #ifdef UNICODE
-	lstrcpy(Data.MessageBox, _T("MessageBoxW"));
+	strcpy(Data.strMessageBox, "MessageBoxW");
 #else
-	lstrcpy(Data.MessageBox, _T("MessageBoxA"));
+	lstrcpy(Data.strMessageBox, _T("MessageBoxA"));
 #endif
 
 	lstrcpy(Data.Str, _T("Inject Code"));
