@@ -61,6 +61,10 @@ BOOL CPEParseDlg::OnInitDialog()
 
 	m_SectionList.SetColumnWidth(0, LVSCW_AUTOSIZE_USEHEADER);
 	m_SectionList.SetColumnWidth(1, LVSCW_AUTOSIZE_USEHEADER);
+	m_SectionList.SetColumnWidth(2, LVSCW_AUTOSIZE_USEHEADER);
+	m_SectionList.SetColumnWidth(3, LVSCW_AUTOSIZE_USEHEADER);
+	m_SectionList.SetColumnWidth(4, LVSCW_AUTOSIZE_USEHEADER);
+	m_SectionList.SetColumnWidth(5, LVSCW_AUTOSIZE_USEHEADER);
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -222,7 +226,9 @@ VOID CPEParseDlg::EnumSections()
 	CString strToShow;
 	for (iLoop = 0; iLoop < iSecNum; iLoop++)
 	{
-		m_SectionList.InsertItem(iLoop, (LPCTSTR)m_pSecHead[iLoop].Name);
+		//unsigned char数组不能直接强转为LPCTSTR
+		USES_CONVERSION;
+		m_SectionList.InsertItem(iLoop, A2CT((char *)m_pSecHead[iLoop].Name));
 
 		strToShow.Format(_T("%08x"), m_pSecHead[iLoop].VirtualAddress);
 		m_SectionList.SetItemText(iLoop, 1, strToShow);
