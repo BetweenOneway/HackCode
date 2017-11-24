@@ -10,6 +10,8 @@
 #include <stdexcept>
 using namespace std;
 
+#include "PublicFunction.h"
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -48,6 +50,7 @@ SIGN Sign[2] =
 CPEParseDlg::CPEParseDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(IDD_PEPARSE_DIALOG, pParent)
 	, filePath(_T(""))
+	, m_nSelect(0)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -56,6 +59,9 @@ void CPEParseDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_LIST_SECTION, m_SectionList);
+	DDX_Control(pDX, IDC_EDIT_VA, m_CtlVA);
+	DDX_Control(pDX, IDC_EDIT_RVA, m_CtlRVA);
+	DDX_Control(pDX, IDC_EDIT_FILEOFFSET, m_CtlFileOffset);
 }
 
 BEGIN_MESSAGE_MAP(CPEParseDlg, CDialogEx)
@@ -64,6 +70,10 @@ BEGIN_MESSAGE_MAP(CPEParseDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_CHOOSEFILE, &CPEParseDlg::OnBnClickedButtonChoosefile)
 	ON_BN_CLICKED(IDCANCEL, &CPEParseDlg::OnBnClickedCancel)
 	ON_BN_CLICKED(IDC_BUTTON_CHECK, &CPEParseDlg::OnBnClickedButtonCheck)
+	ON_BN_CLICKED(IDC_BUTTON_VA, &CPEParseDlg::OnBnClickedButtonVa)
+	ON_BN_CLICKED(IDC_BUTTON_RVA, &CPEParseDlg::OnBnClickedButtonRva)
+	ON_BN_CLICKED(IDC_BUTTON_FILEOFFSET, &CPEParseDlg::OnBnClickedButtonFileoffset)
+	ON_BN_CLICKED(IDC_BUTTON_CALC, &CPEParseDlg::OnBnClickedButtonCalc)
 END_MESSAGE_MAP()
 
 
@@ -338,4 +348,160 @@ VOID CPEParseDlg::GetPEPackInfo()
 		SetDlgItemText(IDC_EDIT_PEPACKINFO, _T("未知"));
 	}
 	return VOID();
+}
+
+
+void CPEParseDlg::OnBnClickedButtonVa()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	m_nSelect = 1;
+	m_CtlVA.SetReadOnly(FALSE);
+	m_CtlRVA.SetReadOnly(TRUE);
+	m_CtlFileOffset.SetReadOnly(TRUE);
+}
+
+
+void CPEParseDlg::OnBnClickedButtonRva()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	m_nSelect = 2;
+	m_CtlVA.SetReadOnly(TRUE);
+	m_CtlRVA.SetReadOnly(FALSE);
+	m_CtlFileOffset.SetReadOnly(TRUE);
+}
+
+
+void CPEParseDlg::OnBnClickedButtonFileoffset()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	m_nSelect = 3;
+	m_CtlVA.SetReadOnly(TRUE);
+	m_CtlRVA.SetReadOnly(TRUE);
+	m_CtlFileOffset.SetReadOnly(FALSE);
+}
+
+
+// 获取输入的地址
+DWORD CPEParseDlg::GetAddr()
+{
+	TCHAR szAddr[10] = { 0 };
+	DWORD dwAddr = 0;
+
+	switch (m_nSelect)
+	{
+	case 1:
+		GetDlgItemText(IDC_EDIT_VA, szAddr, 10);
+		HexStrToInt(szAddr, &dwAddr);
+		break;
+	case 2:
+		GetDlgItemText(IDC_EDIT_RVA, szAddr, 10);
+		HexStrToInt(szAddr, &dwAddr);
+		break;
+	case 3:
+		GetDlgItemText(IDC_EDIT_FILEOFFSET, szAddr, 10);
+		HexStrToInt(szAddr, &dwAddr);
+		break;
+	default:
+		break;
+	}
+	return dwAddr;
+}
+
+
+// 获取指定地址属于第几个节区
+int CPEParseDlg::GetAddrInSecNum(DWORD dwAddr)
+{
+	int nInNum = 0;
+	int nSecNum = m_pNtHeader->FileHeader.NumberOfSections;
+	DWORD dwImageBase = m_pNtHeader->OptionalHeader.ImageBase;
+	switch (m_nSelect)
+	{
+	case 1:
+		
+		for (nInNum = 0; nInNum < nSecNum; nInNum++)
+		{
+			if (dwAddr >= dwImageBase + m_pSecHead[nInNum].VirtualAddress && dwAddr <= dwImageBase + m_pSecHead[nInNum].VirtualAddress + m_pSecHead[nInNum].Misc.VirtualSize)
+			{
+				return nInNum;
+			}
+		}
+		break;
+	case 2:
+		for (nInNum =0;nInNum<nSecNum;nInNum++)
+		{
+			if (dwAddr>= m_pSecHead[nInNum].VirtualAddress && dwAddr <= m_pSecHead[nInNum].VirtualAddress + m_pSecHead[nInNum].Misc.VirtualSize)
+			{
+				return nInNum;
+			}
+		}
+		break;
+	case 3:
+		for (nInNum =0;nInNum < nSecNum;nInNum++)
+		{
+			if (dwAddr >= m_pSecHead[nInNum].PointerToRawData && dwAddr<=m_pSecHead[nInNum].PointerToRawData + m_pSecHead[nInNum].SizeOfRawData)
+			{
+				return nInNum;
+			}
+		}
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+
+// 地址计算
+VOID CPEParseDlg::CalcAddr(int nInNum, DWORD dwAddr)
+{
+	DWORD dwVa = 0;
+	DWORD dwRva = 0;
+	DWORD dwFileOffset = 0;
+
+	switch (m_nSelect)
+	{
+	case 1:
+		dwVa = dwAddr;
+		dwRva = dwVa - m_pNtHeader->OptionalHeader.ImageBase;
+		dwFileOffset = m_pSecHead[nInNum].PointerToRawData = (dwRva - m_pSecHead[nInNum].VirtualAddress);
+		break;
+	case 2:
+		dwVa = dwAddr + m_pNtHeader->OptionalHeader.ImageBase;
+		dwRva = dwAddr;
+		dwFileOffset = m_pSecHead[nInNum].PointerToRawData + (dwRva -m_pSecHead[nInNum].VirtualAddress);
+		break;
+	case 3:
+		dwFileOffset = dwAddr;
+		dwRva = m_pSecHead[nInNum].VirtualAddress + (dwFileOffset - m_pSecHead[nInNum].PointerToRawData);
+		dwVa = dwRva + m_pNtHeader->OptionalHeader.ImageBase;
+		break;
+	default:
+		break;
+	}
+	USES_CONVERSION;
+	SetDlgItemText(IDC_EDIT_SECTION,A2CT((char *)m_pSecHead[nInNum].Name));
+
+	CString str;
+	str.Format(_T("%08x"), dwVa);
+	SetDlgItemText(IDC_EDIT_VA, str);
+
+	str.Format(_T("%08x"), dwRva);
+	SetDlgItemText(IDC_EDIT_RVA, str);
+
+	str.Format(_T("%08x"), dwFileOffset);
+	SetDlgItemText(IDC_EDIT_FILEOFFSET, str);
+
+	return VOID();
+}
+
+
+void CPEParseDlg::OnBnClickedButtonCalc()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	DWORD dwAddr;
+	dwAddr = GetAddr();
+
+	int nInNum = GetAddrInSecNum(dwAddr);
+
+	CalcAddr(nInNum, dwAddr);
 }

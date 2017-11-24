@@ -4,6 +4,7 @@
 
 #pragma once
 #include "afxcmn.h"
+#include "afxwin.h"
 
 
 // CPEParseDlg 对话框
@@ -59,4 +60,24 @@ public:
 	CString filePath;
 	// 获取PE壳信息
 	VOID GetPEPackInfo();
+	// 虚拟地址 控件变量
+	CEdit m_CtlVA;
+	// 相对虚拟地址
+	CEdit m_CtlRVA;
+	// 文件偏移地址
+	CEdit m_CtlFileOffset;
+	afx_msg void OnBnClickedButtonVa();
+	afx_msg void OnBnClickedButtonRva();
+	afx_msg void OnBnClickedButtonFileoffset();
+private:
+	// 输入的是哪个地址 1--虚拟地址 2--相对虚拟地址 3--文件偏移地址
+	int m_nSelect;
+public:
+	// 获取输入的地址
+	DWORD GetAddr();
+	// 获取指定地址属于第几个节区
+	int GetAddrInSecNum(DWORD dwAddr);
+	// 地址计算
+	VOID CalcAddr(int nInNum, DWORD dwAddr);
+	afx_msg void OnBnClickedButtonCalc();
 };
