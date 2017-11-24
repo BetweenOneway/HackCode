@@ -196,6 +196,25 @@ void CPEParseDlg::OnBnClickedCancel()
 	CDialogEx::OnCancel();
 }
 
+int filter(unsigned int code, struct _EXCEPTION_POINTERS *ep)
+{
+
+	puts("in filter.");
+
+	if (code == EXCEPTION_ACCESS_VIOLATION) 
+	{
+		puts("caught AV as expected.");
+		return EXCEPTION_EXECUTE_HANDLER;
+	}
+	else 
+	{
+		puts("didn't catch AV, unexpected.");
+		return EXCEPTION_CONTINUE_SEARCH;
+	};
+
+}
+
+
 
 // 判断是否为PE文件，并获取相关结构指针
 BOOL CPEParseDlg::IsPEFileAndGetPEPointer()
@@ -214,10 +233,11 @@ BOOL CPEParseDlg::IsPEFileAndGetPEPointer()
 		}
 		m_pSecHead = (PIMAGE_SECTION_HEADER)((DWORD)&(m_pNtHeader->OptionalHeader) + m_pNtHeader->FileHeader.SizeOfOptionalHeader);
 	}
-	__finally
+	//__except(EXCEPTION_EXECUTE_HANDLER)
+	__except (filter(GetExceptionCode(), GetExceptionInformation()))
 	{
 		int i = 0;
-		i = i + 1;
+		i++;
 	}
 
 	return TRUE;
