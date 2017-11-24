@@ -57,4 +57,6 @@ public:
 	VOID EnumSections();
 	afx_msg void OnBnClickedButtonCheck();
 	CString filePath;
+	// 获取PE壳信息
+	VOID GetPEPackInfo();
 };

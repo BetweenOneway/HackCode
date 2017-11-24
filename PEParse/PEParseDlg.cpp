@@ -6,6 +6,9 @@
 #include "PEParse.h"
 #include "PEParseDlg.h"
 #include "afxdialogex.h"
+//错误处理
+#include <stdexcept>
+using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -13,8 +16,34 @@
 
 
 // CPEParseDlg 对话框
+#define NAMELEN (20*sizeof(TCHAR))
+#define SIGNLEN (32*sizeof(BYTE))
 
+typedef struct _SIGN
+{
+	TCHAR szName[NAMELEN];
+	BYTE bSign[SIGNLEN + 1];
+}SIGN,*PSIGN;
 
+SIGN Sign[2] = 
+{
+	//vc6
+	{
+		_T("VC6"),
+		(BYTE)"\x55\x8B\xEC\x6A\xFF\x68\xC0\x54\x41\x00"\
+		"\x68\xF8\x26\x40\x00\x64\xA1\x00\x00\x00"\
+		"\x00\x50\x64\x89\x25\x00\x00\x00\x00\x83"\
+		"\xC4\x94"
+	},
+	//aspack
+	{
+		_T("ASPACK"),
+		(BYTE)"\x60\xE8\x03\x00\x00\x00\xE9\xEB\x04\x5D"\
+		"\x45\x55\xC3\xE8\x01\x00\x00\x00\xEB\x5D"\
+		"\xBB\xED\xFF\xFF\xFF\x03\xDD\x81\xEB\x00"\
+		"\xB0\x01"
+	}
+};
 
 CPEParseDlg::CPEParseDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(IDD_PEPARSE_DIALOG, pParent)
@@ -171,17 +200,25 @@ void CPEParseDlg::OnBnClickedCancel()
 // 判断是否为PE文件，并获取相关结构指针
 BOOL CPEParseDlg::IsPEFileAndGetPEPointer()
 {
-	m_pDosHead = (PIMAGE_DOS_HEADER)m_lpBase;
-	if (IMAGE_DOS_SIGNATURE != m_pDosHead->e_magic )
+	__try
 	{
-		return FALSE;
+		m_pDosHead = (PIMAGE_DOS_HEADER)m_lpBase;
+		if (IMAGE_DOS_SIGNATURE != m_pDosHead->e_magic)
+		{
+			return FALSE;
+		}
+		m_pNtHeader = (PIMAGE_NT_HEADERS)((DWORD)m_lpBase + m_pDosHead->e_lfanew);
+		if (IMAGE_NT_SIGNATURE != m_pNtHeader->Signature)
+		{
+			return FALSE;
+		}
+		m_pSecHead = (PIMAGE_SECTION_HEADER)((DWORD)&(m_pNtHeader->OptionalHeader) + m_pNtHeader->FileHeader.SizeOfOptionalHeader);
 	}
-	m_pNtHeader = (PIMAGE_NT_HEADERS)((DWORD)m_lpBase + m_pDosHead->e_lfanew);
-	if (IMAGE_NT_SIGNATURE != m_pNtHeader->Signature)
+	__finally
 	{
-		return FALSE;
+		int i = 0;
+		i = i + 1;
 	}
-	m_pSecHead = (PIMAGE_SECTION_HEADER)((DWORD)&(m_pNtHeader->OptionalHeader) + m_pNtHeader->FileHeader.SizeOfOptionalHeader);
 
 	return TRUE;
 }
@@ -259,4 +296,26 @@ void CPEParseDlg::OnBnClickedButtonCheck()
 	}
 	ParseBasePE();
 	EnumSections();
+	GetPEPackInfo();
+}
+
+
+// 获取PE壳信息
+VOID CPEParseDlg::GetPEPackInfo()
+{
+	PBYTE pSign = NULL;
+	pSign = (PBYTE)((DWORD)m_lpBase + m_pNtHeader->OptionalHeader.AddressOfEntryPoint);
+	if (0 == memcmp(Sign[0].bSign,pSign,SIGNLEN))
+	{
+		SetDlgItemText(IDC_EDIT_PEPACKINFO, Sign[0].szName);
+	}
+	else if (0 == memcmp(Sign[1].bSign, pSign, SIGNLEN))
+	{
+		SetDlgItemText(IDC_EDIT_PEPACKINFO, Sign[1].szName);
+	}
+	else
+	{
+		SetDlgItemText(IDC_EDIT_PEPACKINFO, _T("未知"));
+	}
+	return VOID();
 }
