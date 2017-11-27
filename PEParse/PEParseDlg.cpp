@@ -463,7 +463,7 @@ VOID CPEParseDlg::CalcAddr(int nInNum, DWORD dwAddr)
 	case 1:
 		dwVa = dwAddr;
 		dwRva = dwVa - m_pNtHeader->OptionalHeader.ImageBase;
-		dwFileOffset = m_pSecHead[nInNum].PointerToRawData = (dwRva - m_pSecHead[nInNum].VirtualAddress);
+		dwFileOffset = m_pSecHead[nInNum].PointerToRawData + (dwRva - m_pSecHead[nInNum].VirtualAddress);
 		break;
 	case 2:
 		dwVa = dwAddr + m_pNtHeader->OptionalHeader.ImageBase;
