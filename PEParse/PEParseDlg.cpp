@@ -236,14 +236,17 @@ BOOL CPEParseDlg::IsPEFileAndGetPEPointer()
 		{
 			return FALSE;
 		}
-		m_pNtHeader = (PIMAGE_NT_HEADERS)((DWORD)m_lpBase + m_pDosHead->e_lfanew);
+		/*
+		1、针对64位程序，指针会扩展到8个字节，转换时要防止位数丢失
+		2、指针的加减法是=sizeof(指针所指类型)*偏移量
+		*/
+		m_pNtHeader = (PIMAGE_NT_HEADERS)((LPSTR)m_pDosHead + m_pDosHead->e_lfanew);
 		if (IMAGE_NT_SIGNATURE != m_pNtHeader->Signature)
 		{
 			return FALSE;
 		}
-		m_pSecHead = (PIMAGE_SECTION_HEADER)((DWORD)&(m_pNtHeader->OptionalHeader) + m_pNtHeader->FileHeader.SizeOfOptionalHeader);
+		m_pSecHead = (PIMAGE_SECTION_HEADER)((LPSTR)(&(m_pNtHeader->OptionalHeader)) + m_pNtHeader->FileHeader.SizeOfOptionalHeader);
 	}
-	//__except(EXCEPTION_EXECUTE_HANDLER)
 	__except (filter(GetExceptionCode(), GetExceptionInformation()))
 	{
 		int i = 0;
@@ -334,7 +337,7 @@ void CPEParseDlg::OnBnClickedButtonCheck()
 VOID CPEParseDlg::GetPEPackInfo()
 {
 	PBYTE pSign = NULL;
-	pSign = (PBYTE)((DWORD)m_lpBase + m_pNtHeader->OptionalHeader.AddressOfEntryPoint);
+	pSign = (PBYTE)((LPSTR)m_lpBase + m_pNtHeader->OptionalHeader.AddressOfEntryPoint);
 	if (0 == memcmp(Sign[0].bSign,pSign,SIGNLEN))
 	{
 		SetDlgItemText(IDC_EDIT_PEPACKINFO, Sign[0].szName);
