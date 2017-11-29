@@ -74,6 +74,7 @@ BEGIN_MESSAGE_MAP(CPEParseDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_RVA, &CPEParseDlg::OnBnClickedButtonRva)
 	ON_BN_CLICKED(IDC_BUTTON_FILEOFFSET, &CPEParseDlg::OnBnClickedButtonFileoffset)
 	ON_BN_CLICKED(IDC_BUTTON_CALC, &CPEParseDlg::OnBnClickedButtonCalc)
+	ON_BN_CLICKED(IDC_BUTTON_ADD_SECTION, &CPEParseDlg::OnBnClickedButtonAddSection)
 END_MESSAGE_MAP()
 
 
@@ -104,6 +105,10 @@ BOOL CPEParseDlg::OnInitDialog()
 	m_SectionList.SetColumnWidth(3, LVSCW_AUTOSIZE_USEHEADER);
 	m_SectionList.SetColumnWidth(4, LVSCW_AUTOSIZE_USEHEADER);
 	m_SectionList.SetColumnWidth(5, LVSCW_AUTOSIZE_USEHEADER);
+
+	m_lpBase = NULL;
+	m_hMap = NULL;
+	m_hFile = NULL;
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -156,7 +161,7 @@ void CPEParseDlg::OnBnClickedButtonChoosefile()
 	{
 		filePath = openFileDlg.GetPathName();
 	}
-	CWnd::SetDlgItemTextW(IDC_EDIT_FILEPATH, filePath);
+	CWnd::SetDlgItemText(IDC_EDIT_FILEPATH, filePath);
 }
 
 
@@ -168,9 +173,13 @@ BOOL CPEParseDlg::FileMapping(TCHAR * szFileName)
 	{
 		return FALSE;
 	}
+	//不注释SEC_IMAGE会影响增加节区，注释掉会影响查壳
 	m_hMap = CreateFileMapping(m_hFile, NULL, PAGE_READWRITE | SEC_IMAGE, 0, 0, 0);
 	if (NULL == m_hMap)
 	{
+		TCHAR szErrorMsg[MAX_PATH];
+		FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, GetLastError(), 0, szErrorMsg, MAXBYTE, 0);
+		MessageBox(szErrorMsg, _T("CreateFileMapping Error"), MB_OK);
 		CloseHandle(m_hFile);
 		return FALSE;
 	}
@@ -291,6 +300,9 @@ VOID CPEParseDlg::ParseBasePE()
 
 VOID CPEParseDlg::EnumSections()
 {
+	//清空列表
+	m_SectionList.DeleteAllItems();
+
 	int iSecNum = m_pNtHeader->FileHeader.NumberOfSections;
 	int iLoop = 0;
 	CString strToShow;
@@ -507,4 +519,80 @@ void CPEParseDlg::OnBnClickedButtonCalc()
 	int nInNum = GetAddrInSecNum(dwAddr);
 
 	CalcAddr(nInNum, dwAddr);
+}
+
+
+void CPEParseDlg::OnBnClickedButtonAddSection()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	TCHAR szSecName[8] = { 0 };
+	int nSecSize = 0;
+
+	GetDlgItemText(IDC_EDIT_SEC_NAME, szSecName, 8*sizeof(TCHAR));
+	nSecSize = GetDlgItemInt(IDC_EDIT_SEC_SIZE, FALSE, TRUE);
+
+	//增加节区
+	AddSec(szSecName, nSecSize);
+}
+
+
+// 增加节区
+VOID CPEParseDlg::AddSec(TCHAR * szSecName, int nSecSize)
+{
+	int nSecNum = m_pNtHeader->FileHeader.NumberOfSections;
+	DWORD dwFileAlignment = m_pNtHeader->OptionalHeader.FileAlignment;
+	DWORD dwSecAlignment = m_pNtHeader->OptionalHeader.SectionAlignment;
+
+	PIMAGE_SECTION_HEADER pTmpSec = m_pSecHead + nSecNum;
+
+	//拷贝节名 系统定义是BYTE类型
+	USES_CONVERSION;
+	strncpy(LPSTR(pTmpSec->Name), T2A(szSecName), 7);
+	//节的内存大小
+	pTmpSec->Misc.VirtualSize = AlignSize(nSecSize,dwSecAlignment);
+	//节的内存起始位置
+	pTmpSec->VirtualAddress = m_pSecHead[nSecNum].VirtualAddress + AlignSize(m_pSecHead[nSecNum - 1].Misc.VirtualSize, dwSecAlignment);
+	//节的文件大小
+	pTmpSec->SizeOfRawData = AlignSize(nSecSize, dwFileAlignment);
+	//节的文件起始地址
+	pTmpSec->PointerToRawData = m_pSecHead[nSecNum - 1].PointerToRawData + AlignSize(m_pSecHead[nSecNum - 1].SizeOfRawData, dwSecAlignment);
+
+	//修正节数量
+	m_pNtHeader->FileHeader.NumberOfSections++;
+	//
+	m_pNtHeader->OptionalHeader.SizeOfImage += pTmpSec->Misc.VirtualSize;
+	FlushViewOfFile(m_lpBase, 0);
+	//添加节数据
+	AddSecData(pTmpSec->SizeOfRawData);
+
+	EnumSections();
+	return VOID();
+}
+
+
+// 对齐
+DWORD CPEParseDlg::AlignSize(int nSecSize, DWORD Alignment)
+{
+	int nSize = nSecSize;
+	if (0!= nSize % Alignment)
+	{
+		nSecSize = (nSize/Alignment + 1)*Alignment;
+	}
+	return nSecSize;
+}
+
+
+// 添加数据
+VOID CPEParseDlg::AddSecData(int nSecSize)
+{
+	PBYTE pByte = NULL;
+	pByte = (PBYTE)malloc(nSecSize);
+	ZeroMemory(pByte, nSecSize);
+	DWORD dwNum = 0;
+	SetFilePointer(m_hFile, 0, 0, FILE_END);
+	WriteFile(m_hFile, pByte, nSecSize, &dwNum, NULL);
+	FlushFileBuffers(m_hFile);
+
+	free(pByte);
+	return VOID();
 }

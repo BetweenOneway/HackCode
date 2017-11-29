@@ -80,4 +80,11 @@ public:
 	// 地址计算
 	VOID CalcAddr(int nInNum, DWORD dwAddr);
 	afx_msg void OnBnClickedButtonCalc();
+	afx_msg void OnBnClickedButtonAddSection();
+	// 增加节区
+	VOID AddSec(TCHAR * szSecName, int nSecSize);
+	// 对齐
+	DWORD AlignSize(int nSecSize, DWORD Alignment);
+	// 添加数据
+	VOID AddSecData(int nSecSize);
 };
