@@ -173,7 +173,10 @@ BOOL CPEParseDlg::FileMapping(TCHAR * szFileName)
 	{
 		return FALSE;
 	}
-	//不注释SEC_IMAGE会影响增加节区，注释掉会影响查壳
+	/*
+	无法映射添加过节区的程序
+	注释掉SEC_IMAGE也不影响解析?
+	*/
 	m_hMap = CreateFileMapping(m_hFile, NULL, PAGE_READWRITE | SEC_IMAGE, 0, 0, 0);
 	if (NULL == m_hMap)
 	{
@@ -258,8 +261,7 @@ BOOL CPEParseDlg::IsPEFileAndGetPEPointer()
 	}
 	__except (filter(GetExceptionCode(), GetExceptionInformation()))
 	{
-		int i = 0;
-		i++;
+		//异常处理
 	}
 
 	return TRUE;
