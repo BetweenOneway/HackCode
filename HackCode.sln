@@ -21,6 +21,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PEParse", "PEParse\PEParse.
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EasyCrackMe", "EasyCrackMe\EasyCrackMe.vcxproj", "{9B918CED-C423-4CC7-ADD0-4A7CA77D7A12}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FilePatch", "FilePatch\FilePatch.vcxproj", "{D3B179AE-BA6D-42B8-931B-7AC2B0A478D3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -101,6 +103,14 @@ Global
 		{9B918CED-C423-4CC7-ADD0-4A7CA77D7A12}.Release|x64.Build.0 = Release|x64
 		{9B918CED-C423-4CC7-ADD0-4A7CA77D7A12}.Release|x86.ActiveCfg = Release|Win32
 		{9B918CED-C423-4CC7-ADD0-4A7CA77D7A12}.Release|x86.Build.0 = Release|Win32
+		{D3B179AE-BA6D-42B8-931B-7AC2B0A478D3}.Debug|x64.ActiveCfg = Debug|x64
+		{D3B179AE-BA6D-42B8-931B-7AC2B0A478D3}.Debug|x64.Build.0 = Debug|x64
+		{D3B179AE-BA6D-42B8-931B-7AC2B0A478D3}.Debug|x86.ActiveCfg = Debug|Win32
+		{D3B179AE-BA6D-42B8-931B-7AC2B0A478D3}.Debug|x86.Build.0 = Debug|Win32
+		{D3B179AE-BA6D-42B8-931B-7AC2B0A478D3}.Release|x64.ActiveCfg = Release|x64
+		{D3B179AE-BA6D-42B8-931B-7AC2B0A478D3}.Release|x64.Build.0 = Release|x64
+		{D3B179AE-BA6D-42B8-931B-7AC2B0A478D3}.Release|x86.ActiveCfg = Release|Win32
+		{D3B179AE-BA6D-42B8-931B-7AC2B0A478D3}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

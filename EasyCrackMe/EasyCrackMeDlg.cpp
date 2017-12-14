@@ -124,11 +124,11 @@ void CEasyCrackMeDlg::OnBnClickedOk()
 
 	if (0 == _tcscmp(szTmpPassWord,szPassWord))
 	{
-		MessageBox(_T("ÃÜÂëÕıÈ·"));
+		MessageBox("Password Correct");
 	}
 	else
 	{
-		MessageBox(_T("ÃÜÂë´íÎó"));
+		MessageBox("Password Wrong");
 	}
 	//CDialogEx::OnOK();
 }
