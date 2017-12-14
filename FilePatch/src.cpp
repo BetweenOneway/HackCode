@@ -3,6 +3,7 @@
 
 int main(int argc, char *argv[])
 {
+	//文件偏移地址
 	DWORD dwFileOffset = 0x0019AF;
 	BYTE bCode = 0;
 	DWORD dwReadNum = 0;
@@ -21,6 +22,7 @@ int main(int argc, char *argv[])
 	SetFilePointer(hFile,dwFileOffset,0,FILE_BEGIN);
 	ReadFile(hFile, (LPVOID)&bCode, sizeof(BYTE), &dwReadNum, NULL);
 
+	//\x75是JNZ命令的ASCII码
 	if ('\x75' != bCode)
 	{
 		printf("%02x\r\n", bCode);
@@ -28,6 +30,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	//\x74是命令JZ的ASCII码
 	bCode = '\x74';
 	SetFilePointer(hFile, dwFileOffset, 0, FILE_BEGIN);
 	WriteFile(hFile, (LPVOID)&bCode, sizeof(BYTE), &dwReadNum, NULL);
